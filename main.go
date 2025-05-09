@@ -139,7 +139,7 @@ func readLast30DaysEmails() {
 		fmt.Printf("Message ID: %s, Subject: %s\n", m.Id, getSubject(msg))
 
 		// Store the email ID and time in activity.json
-		if err := activityManager.WriteEmailFetchTime(m.Id, msg); err != nil {
+		if err := activityManager.StoreEmailFetchTime(m.Id, msg); err != nil {
 			log.Printf("Error storing email ID: %v", err)
 		}
 
@@ -172,7 +172,7 @@ func readLast30DaysEmails() {
 	}
 
 	// Write the last fetch time to activity.json
-	if err := activityManager.WriteLastFetchTime(); err != nil {
+	if err := activityManager.StoreLastFetchTime(); err != nil {
 		log.Printf("Error writing last fetch time: %v", err)
 	}
 
