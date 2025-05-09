@@ -1,4 +1,5 @@
-attachments/
+.DS_Store
 activity.json
-token.json
+attachments/
 client_secret_*.json
+token.json

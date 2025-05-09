@@ -119,9 +119,15 @@ func readLast30DaysEmails() {
 	}
 
 	user := "me"
-	// Calculate the date 30 days ago
-	thirtyDaysAgo := time.Now().AddDate(0, 0, -30).Format("2006/01/02")
-	query := fmt.Sprintf("after:%s has:attachment filename:pdf", thirtyDaysAgo)
+	// Read the last fetch time from activity.json
+	lastFetchTime, err := ReadLastFetchTime()
+	if err != nil {
+		log.Printf("Error reading last fetch time: %v", err)
+		// Default to last 30 days if there's an error
+		lastFetchTime = time.Now().AddDate(0, 0, -30).Format("2006/01/02")
+	}
+
+	query := fmt.Sprintf("after:%s has:attachment filename:pdf", lastFetchTime)
 	r, err := srv.Users.Messages.List(user).Q(query).Do()
 	if err != nil {
 		log.Fatalf("Unable to retrieve messages: %v", err)
@@ -167,6 +173,11 @@ func readLast30DaysEmails() {
 				fmt.Printf("Downloaded attachment: %s\n", part.Filename)
 			}
 		}
+	}
+
+	// Write the last fetch time to activity.json
+	if err := WriteLastFetchTime(); err != nil {
+		log.Printf("Error writing last fetch time: %v", err)
 	}
 }
 
