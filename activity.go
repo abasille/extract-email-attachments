@@ -52,15 +52,21 @@ func (am *ActivityManager) Load() error {
 
 // Save writes the in-memory activity data back to the file.
 func (am *ActivityManager) Save() error {
+	// Marshal the data with indentation
+	data, err := json.MarshalIndent(am.data, "", "    ")
+	if err != nil {
+		return fmt.Errorf("error encoding activity data: %v", err)
+	}
+
+	// Write the formatted data to the file
 	file, err := os.Create("./activity.json")
 	if err != nil {
 		return fmt.Errorf("error creating activity.json: %v", err)
 	}
 	defer file.Close()
 
-	encoder := json.NewEncoder(file)
-	if err := encoder.Encode(am.data); err != nil {
-		return fmt.Errorf("error encoding activity data: %v", err)
+	if _, err := file.Write(data); err != nil {
+		return fmt.Errorf("error writing to activity.json: %v", err)
 	}
 
 	fmt.Println("Saved activity data to activity.json.")
