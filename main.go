@@ -84,22 +84,8 @@ func saveToken(path string, token *oauth2.Token) {
 	json.NewEncoder(f).Encode(token)
 }
 
-// ensureActivityFileExists checks if the activity.json file exists and creates it if it doesn't.
-func ensureActivityFileExists() {
-	if _, err := os.Stat("./activity.json"); os.IsNotExist(err) {
-		file, err := os.Create("./activity.json")
-		if err != nil {
-			log.Fatalf("Error creating activity.json: %v", err)
-		}
-		file.Close()
-		fmt.Println("Created activity.json file.")
-	}
-}
-
 // readLast30DaysEmails reads emails from Gmail for the last 30 days, filtering only those with PDF attachments.
 func readLast30DaysEmails() {
-	ensureActivityFileExists()
-
 	ctx := context.Background()
 	b, err := os.ReadFile("client_secret_736802718299-09qksrnedamuqnub21d2ufm6coa1msuh.apps.googleusercontent.com.json")
 	if err != nil {
@@ -119,8 +105,13 @@ func readLast30DaysEmails() {
 	}
 
 	user := "me"
+	activityManager := NewActivityManager()
+	if err := activityManager.Load(); err != nil {
+		log.Printf("Error loading activity data: %v", err)
+		return
+	}
 	// Read the last fetch time from activity.json
-	lastFetchTime, err := ReadLastFetchTime()
+	lastFetchTime, err := activityManager.ReadLastFetchTime()
 	if err != nil {
 		log.Printf("Error reading last fetch time: %v", err)
 		// Default to last 30 days if there's an error
@@ -134,7 +125,7 @@ func readLast30DaysEmails() {
 	}
 
 	if len(r.Messages) == 0 {
-		fmt.Println("No messages found.")
+		fmt.Printf("No messages found since last fetch: %s\n", lastFetchTime)
 		return
 	}
 
@@ -146,6 +137,11 @@ func readLast30DaysEmails() {
 			continue
 		}
 		fmt.Printf("Message ID: %s, Subject: %s\n", m.Id, getSubject(msg))
+
+		// Store the email ID and time in activity.json
+		if err := activityManager.WriteEmailFetchTime(m.Id, msg); err != nil {
+			log.Printf("Error storing email ID: %v", err)
+		}
 
 		// Download attachments
 		for _, part := range msg.Payload.Parts {
@@ -176,8 +172,12 @@ func readLast30DaysEmails() {
 	}
 
 	// Write the last fetch time to activity.json
-	if err := WriteLastFetchTime(); err != nil {
+	if err := activityManager.WriteLastFetchTime(); err != nil {
 		log.Printf("Error writing last fetch time: %v", err)
+	}
+
+	if err := activityManager.Save(); err != nil {
+		log.Printf("Error saving activity data: %v", err)
 	}
 }
 
