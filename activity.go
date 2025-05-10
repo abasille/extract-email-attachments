@@ -170,3 +170,13 @@ func extractSenderInfo(fromHeader string) (name, email string) {
 	}
 	return
 }
+
+// HasEmailID checks if an email ID already exists in the activity data.
+func (am *ActivityManager) HasEmailID(emailID string) bool {
+	for _, email := range am.data.Emails {
+		if email.ID == emailID {
+			return true
+		}
+	}
+	return false
+}
