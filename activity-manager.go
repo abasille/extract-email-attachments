@@ -6,10 +6,27 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"google.golang.org/api/gmail/v1"
 )
+
+const (
+	defaultDirPerm  = 0755
+	defaultFilePath = "./activity.json"
+	defaultFilePerm = 0644
+)
+
+// ActivityManagerInterface defines the interface for activity management operations
+type ActivityManagerInterface interface {
+	Load() error
+	Save() error
+	HasEmailID(string) bool
+	StoreEmailFetchTime(string, *gmail.Message) error
+	ReadLastFetchTime() (string, error)
+	StoreLastFetchTime() error
+}
 
 // ActivityData represents the structure of the activity.json file.
 type ActivityData struct {
@@ -29,19 +46,33 @@ type EmailData struct {
 
 // ActivityManager manages the activity data operations.
 type ActivityManager struct {
-	data ActivityData
+	mu       sync.RWMutex
+	data     ActivityData
+	filePath string
 }
 
 // NewActivityManager creates a new ActivityManager instance.
 func NewActivityManager() *ActivityManager {
 	return &ActivityManager{
-		data: ActivityData{},
+		data:     ActivityData{},
+		filePath: defaultFilePath,
+	}
+}
+
+// NewActivityManagerWithPath creates a new ActivityManager instance with a custom file path.
+func NewActivityManagerWithPath(filePath string) *ActivityManager {
+	return &ActivityManager{
+		data:     ActivityData{},
+		filePath: filePath,
 	}
 }
 
 // Load loads the activity data from the file into memory.
 func (am *ActivityManager) Load() error {
-	file, err := os.Open("./activity.json")
+	am.mu.Lock()
+	defer am.mu.Unlock()
+
+	file, err := os.Open(am.filePath)
 	if err != nil {
 		// If the file does not exist, create it with an initial structure
 		if os.IsNotExist(err) {
@@ -50,7 +81,7 @@ func (am *ActivityManager) Load() error {
 			}
 			return am.Save() // Save the initial data to the file
 		}
-		return fmt.Errorf("error opening activity.json: %v", err)
+		return fmt.Errorf("error opening activity file: %v", err)
 	}
 	defer file.Close()
 
@@ -64,6 +95,9 @@ func (am *ActivityManager) Load() error {
 
 // Save writes the in-memory activity data back to the file.
 func (am *ActivityManager) Save() error {
+	am.mu.Lock()
+	defer am.mu.Unlock()
+
 	// Marshal the data with indentation
 	data, err := json.MarshalIndent(am.data, "", "    ")
 	if err != nil {
@@ -71,32 +105,42 @@ func (am *ActivityManager) Save() error {
 	}
 
 	// Write the formatted data to the file
-	file, err := os.Create("./activity.json")
+	file, err := os.Create(am.filePath)
 	if err != nil {
-		return fmt.Errorf("error creating activity.json: %v", err)
+		return fmt.Errorf("error creating activity file: %v", err)
 	}
 	defer file.Close()
 
 	if _, err := file.Write(data); err != nil {
-		return fmt.Errorf("error writing to activity.json: %v", err)
+		return fmt.Errorf("error writing to activity file: %v", err)
 	}
 
-	fmt.Println("Saved activity data to activity.json.")
+	fmt.Println("Saved activity data to", am.filePath)
 	return nil
 }
 
 // ReadLastFetchTime reads the last fetch time from the in-memory activity data and formats it as '2006/01/02'.
 func (am *ActivityManager) ReadLastFetchTime() (string, error) {
+	am.mu.RLock()
+	defer am.mu.RUnlock()
+
+	if am.data.LastFetchTime == "" {
+		return time.Now().AddDate(0, 0, -30).Format(defaultDateFormat), nil
+	}
+
 	t, err := time.Parse(time.RFC3339, am.data.LastFetchTime)
 	if err != nil {
 		return "", fmt.Errorf("error parsing last fetch time: %v", err)
 	}
 
-	return t.Format("2006/01/02"), nil
+	return t.Format(defaultDateFormat), nil
 }
 
 // StoreLastFetchTime updates the last fetch time in the in-memory activity data.
 func (am *ActivityManager) StoreLastFetchTime() error {
+	am.mu.Lock()
+	defer am.mu.Unlock()
+
 	am.data.LastFetchTime = time.Now().Format(time.RFC3339)
 	fmt.Println("Updated last fetch time in memory.")
 	return nil
@@ -104,6 +148,16 @@ func (am *ActivityManager) StoreLastFetchTime() error {
 
 // StoreEmailFetchTime stores the datetime of a fetched email into the in-memory activity data.
 func (am *ActivityManager) StoreEmailFetchTime(emailID string, msg *gmail.Message) error {
+	if emailID == "" {
+		return fmt.Errorf("email ID cannot be empty")
+	}
+	if msg == nil {
+		return fmt.Errorf("message cannot be nil")
+	}
+
+	am.mu.Lock()
+	defer am.mu.Unlock()
+
 	// Initialize EmailData if it doesn't exist
 	if am.data.Emails == nil {
 		am.data.Emails = []EmailData{}
@@ -153,7 +207,8 @@ func (am *ActivityManager) StoreEmailFetchTime(emailID string, msg *gmail.Messag
 		AttachmentName: attachmentName,
 	})
 
-	fmt.Printf("Stored email ID %s with date %s, subject: %s, sender: %s <%s>, attachment: %s in memory.\n", emailID, emailDate, subject, senderName, senderEmail, attachmentName)
+	fmt.Printf("Stored email ID %s with date %s, subject: %s, sender: %s <%s>, attachment: %s in memory.\n",
+		emailID, emailDate, subject, senderName, senderEmail, attachmentName)
 	return nil
 }
 
@@ -173,6 +228,13 @@ func extractSenderInfo(fromHeader string) (name, email string) {
 
 // HasEmailID checks if an email ID already exists in the activity data.
 func (am *ActivityManager) HasEmailID(emailID string) bool {
+	if emailID == "" {
+		return false
+	}
+
+	am.mu.RLock()
+	defer am.mu.RUnlock()
+
 	for _, email := range am.data.Emails {
 		if email.ID == emailID {
 			return true
