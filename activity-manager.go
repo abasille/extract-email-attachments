@@ -27,6 +27,8 @@ type ActivityManagerInterface interface {
 	StoreAttachmentMeta(string, string) error
 	ReadLastFetchTime() (string, error)
 	StoreLastFetchTime() error
+	UpdateAttachmentStatus(string, string) error
+	GetEmailByID(string) (*EmailData, error)
 }
 
 // ActivityData represents the structure of the activity.json file.
@@ -49,6 +51,7 @@ type EmailData struct {
 type AttachmentData struct {
 	Filename string `json:"filename"`
 	EmailID  string `json:"emailId"`
+	Status   string `json:"status,omitempty"`
 }
 
 // ActivityManager manages the activity data operations.
@@ -266,4 +269,39 @@ func (am *ActivityManager) HasEmailID(emailID string) bool {
 		}
 	}
 	return false
+}
+
+// UpdateAttachmentStatus updates the status of an attachment
+func (am *ActivityManager) UpdateAttachmentStatus(filename string, status string) error {
+	if filename == "" {
+		return fmt.Errorf("filename cannot be empty")
+	}
+
+	am.mu.Lock()
+	defer am.mu.Unlock()
+
+	for i, attachment := range am.data.Attachments {
+		if attachment.Filename == filename {
+			am.data.Attachments[i].Status = status
+			return nil
+		}
+	}
+	return fmt.Errorf("attachment not found: %s", filename)
+}
+
+// GetEmailByID returns the email data for a given ID
+func (am *ActivityManager) GetEmailByID(emailID string) (*EmailData, error) {
+	if emailID == "" {
+		return nil, fmt.Errorf("email ID cannot be empty")
+	}
+
+	am.mu.RLock()
+	defer am.mu.RUnlock()
+
+	for _, email := range am.data.Emails {
+		if email.ID == emailID {
+			return &email, nil
+		}
+	}
+	return nil, fmt.Errorf("email not found: %s", emailID)
 }
