@@ -134,18 +134,18 @@ func (gs *GmailService) processMessage(am *ActivityManager, msg *gmail.Message) 
 		return nil
 	}
 
-	if err := am.StoreEmailFetchTime(msg.Id, msg); err != nil {
-		return fmt.Errorf("error storing email ID: %v", err)
+	if err := am.StoreEmailMeta(msg.Id, msg); err != nil {
+		return fmt.Errorf("error storing email metadata: %v", err)
 	}
 
-	return gs.downloadAttachments(msg)
+	return gs.downloadAttachments(msg, am)
 }
 
 // downloadAttachments downloads PDF attachments from a message
-func (gs *GmailService) downloadAttachments(msg *gmail.Message) error {
+func (gs *GmailService) downloadAttachments(msg *gmail.Message, am *ActivityManager) error {
 	for _, part := range msg.Payload.Parts {
 		if part.Filename != "" && part.MimeType == "application/pdf" {
-			if err := gs.downloadAttachment(msg.Id, part); err != nil {
+			if err := gs.downloadAttachment(msg.Id, part, am); err != nil {
 				log.Printf("Error downloading attachment: %v", err)
 				continue
 			}
@@ -155,7 +155,7 @@ func (gs *GmailService) downloadAttachments(msg *gmail.Message) error {
 }
 
 // downloadAttachment downloads a single attachment
-func (gs *GmailService) downloadAttachment(messageID string, part *gmail.MessagePart) error {
+func (gs *GmailService) downloadAttachment(messageID string, part *gmail.MessagePart, am *ActivityManager) error {
 	attachment, err := gs.service.Users.Messages.Attachments.Get(gs.user, messageID, part.Body.AttachmentId).Do()
 	if err != nil {
 		return fmt.Errorf("error getting attachment: %v", err)
@@ -173,6 +173,11 @@ func (gs *GmailService) downloadAttachment(messageID string, part *gmail.Message
 	filePath := fmt.Sprintf("%s/%s", attachmentsDir, part.Filename)
 	if err := os.WriteFile(filePath, data, defaultFilePerm); err != nil {
 		return fmt.Errorf("error writing file: %v", err)
+	}
+
+	// Store attachment metadata
+	if err := am.StoreAttachmentMeta(part.Filename, messageID); err != nil {
+		log.Printf("Error storing attachment metadata: %v", err)
 	}
 
 	fmt.Printf("Downloaded attachment: %s\n", part.Filename)

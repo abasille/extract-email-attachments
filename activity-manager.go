@@ -23,25 +23,32 @@ type ActivityManagerInterface interface {
 	Load() error
 	Save() error
 	HasEmailID(string) bool
-	StoreEmailFetchTime(string, *gmail.Message) error
+	StoreEmailMeta(string, *gmail.Message) error
+	StoreAttachmentMeta(string, string) error
 	ReadLastFetchTime() (string, error)
 	StoreLastFetchTime() error
 }
 
 // ActivityData represents the structure of the activity.json file.
 type ActivityData struct {
-	LastFetchTime string      `json:"lastFetchTime"`
-	Emails        []EmailData `json:"emails"`
+	LastFetchTime string           `json:"lastFetchTime"`
+	Emails        []EmailData      `json:"emails"`
+	Attachments   []AttachmentData `json:"attachments"`
 }
 
-// EmailData represents the structure for storing email fetch times.
+// EmailData represents the structure for storing email metadata.
 type EmailData struct {
-	ID             string `json:"id"`
-	Date           string `json:"date"`
-	Subject        string `json:"subject"`
-	SenderName     string `json:"senderName"`
-	SenderEmail    string `json:"senderEmail"`
-	AttachmentName string `json:"attachmentName"`
+	ID          string `json:"id"`
+	Date        string `json:"date"`
+	Subject     string `json:"subject"`
+	SenderName  string `json:"senderName"`
+	SenderEmail string `json:"senderEmail"`
+}
+
+// AttachmentData represents the structure for storing attachment metadata.
+type AttachmentData struct {
+	Filename string `json:"filename"`
+	EmailID  string `json:"emailId"`
 }
 
 // ActivityManager manages the activity data operations.
@@ -74,12 +81,13 @@ func (am *ActivityManager) Load() error {
 
 	file, err := os.Open(am.filePath)
 	if err != nil {
-		// If the file does not exist, create it with an initial structure
+		// If the file does not exist, initialize the data structure
 		if os.IsNotExist(err) {
 			am.data = ActivityData{
-				Emails: []EmailData{},
+				Emails:      []EmailData{},
+				Attachments: []AttachmentData{},
 			}
-			return am.Save() // Save the initial data to the file
+			return nil
 		}
 		return fmt.Errorf("error opening activity file: %v", err)
 	}
@@ -146,8 +154,8 @@ func (am *ActivityManager) StoreLastFetchTime() error {
 	return nil
 }
 
-// StoreEmailFetchTime stores the datetime of a fetched email into the in-memory activity data.
-func (am *ActivityManager) StoreEmailFetchTime(emailID string, msg *gmail.Message) error {
+// StoreEmailMeta stores the metadata of a fetched email into the in-memory activity data.
+func (am *ActivityManager) StoreEmailMeta(emailID string, msg *gmail.Message) error {
 	if emailID == "" {
 		return fmt.Errorf("email ID cannot be empty")
 	}
@@ -168,7 +176,6 @@ func (am *ActivityManager) StoreEmailFetchTime(emailID string, msg *gmail.Messag
 	var subject string
 	var senderName string
 	var senderEmail string
-	var attachmentName string
 
 	for _, header := range msg.Payload.Headers {
 		switch header.Name {
@@ -189,26 +196,44 @@ func (am *ActivityManager) StoreEmailFetchTime(emailID string, msg *gmail.Messag
 		}
 	}
 
-	// Extract attachment name from the message
-	for _, part := range msg.Payload.Parts {
-		if part.Filename != "" {
-			attachmentName = part.Filename
-			break
-		}
-	}
-
-	// Append the new email ID, date, subject, sender name, sender email, and attachment name
+	// Append the new email metadata
 	am.data.Emails = append(am.data.Emails, EmailData{
-		ID:             emailID,
-		Date:           emailDate,
-		Subject:        subject,
-		SenderName:     senderName,
-		SenderEmail:    senderEmail,
-		AttachmentName: attachmentName,
+		ID:          emailID,
+		Date:        emailDate,
+		Subject:     subject,
+		SenderName:  senderName,
+		SenderEmail: senderEmail,
 	})
 
-	fmt.Printf("Stored email ID %s with date %s, subject: %s, sender: %s <%s>, attachment: %s in memory.\n",
-		emailID, emailDate, subject, senderName, senderEmail, attachmentName)
+	fmt.Printf("Stored email ID %s with date %s, subject: %s, sender: %s <%s> in memory.\n",
+		emailID, emailDate, subject, senderName, senderEmail)
+	return nil
+}
+
+// StoreAttachmentMeta stores the metadata of an attachment into the in-memory activity data.
+func (am *ActivityManager) StoreAttachmentMeta(filename string, emailID string) error {
+	if filename == "" {
+		return fmt.Errorf("filename cannot be empty")
+	}
+	if emailID == "" {
+		return fmt.Errorf("email ID cannot be empty")
+	}
+
+	am.mu.Lock()
+	defer am.mu.Unlock()
+
+	// Initialize Attachments if it doesn't exist
+	if am.data.Attachments == nil {
+		am.data.Attachments = []AttachmentData{}
+	}
+
+	// Append the new attachment metadata
+	am.data.Attachments = append(am.data.Attachments, AttachmentData{
+		Filename: filename,
+		EmailID:  emailID,
+	})
+
+	fmt.Printf("Stored attachment %s for email ID %s in memory.\n", filename, emailID)
 	return nil
 }
 
