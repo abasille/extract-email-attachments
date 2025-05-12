@@ -1,5 +1,22 @@
 # Extract Email Attachments
 
+## Description
+
+Cette application en Go permet d'extraire automatiquement toutes les pièces jointes PDF des emails reçus sur une boîte Gmail, depuis la dernière exécution.
+Les fichiers sont téléchargés dans le sous-dossier `extract-email-attachments` de vos téléchargements, avec gestion de l'historique pour éviter de télécharger plusieurs fois le même document.
+L'authentification s'effectue via OAuth2 (PKCE) et aucune donnée n'est transmise à un service tiers autre que Google Gmail (accès en lecture seule).
+
+## Objectifs du projet
+
+### Pour 2025
+
+- Récupérer toutes les factures envoyées en pièce-jointe d'email, les renommer en respectant un format défini (ex : YYYY-MM-facture-ENTREPRISE-ID) et les déplacer dans un des dossiers stockant mes factures.
+- Utiliser un OCR IA (par exemple Mistral OCR) pour récupérer le nom de l'entreprise, la date d'émission de la facture et le n° de la facture lorsque ces informations ne peuvent pas être déduites de l'email ou du nom de fichier de la pièce-jointe.
+
+### À terme
+
+Analyser la structure des dossiers de mon disque dur, la nature de leur contenu (factures personnelles, devis du conseil syndical, attestation fiscale) et les schémas de nommage des fichiers, pour en déduire comment une pièce-jointe doit être renommée et dans quel dossier la télécharger.
+
 ## Prérequis techniques
 
 - Go 1.20 ou supérieur.
