@@ -10,11 +10,10 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
-	"runtime"
+
 	"strings"
 	"time"
 
-	gosxnotifier "github.com/deckarep/gosx-notifier"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/term"
@@ -112,29 +111,6 @@ func NewGmailService() (*GmailService, error) {
 		service: srv,
 		user:    "me",
 	}, nil
-}
-
-// displayNotification shows a macOS system notification with the given message
-func displayNotification(message string) error {
-	// Check if we're running on macOS
-	if runtime.GOOS != "darwin" {
-		return fmt.Errorf("system notifications are only supported on macOS")
-	}
-
-	// Create a new notification
-	note := gosxnotifier.NewNotification(message)
-
-	// Set notification properties
-	note.Title = "Extract Email Attachments"
-	note.Sound = gosxnotifier.Default
-	note.AppIcon = "mail.icns" // Optional: you can set a custom icon
-
-	// Push the notification
-	if err := note.Push(); err != nil {
-		return fmt.Errorf("failed to display notification: %v", err)
-	}
-
-	return nil
 }
 
 // ProcessEmails reads emails from the last fetch time and processes them.
