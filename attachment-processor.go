@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"extract-email-attachments/config"
 )
 
 // ProcessAttachments processes each attachment in the attachments directory
@@ -18,13 +20,18 @@ func ProcessAttachments() error {
 	}
 
 	// Walk through all files in the attachments directory
-	err := filepath.Walk(attachmentsDir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(config.AttachmentsDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
 		// Skip directories
 		if info.IsDir() {
+			return nil
+		}
+
+		// Skip non-PDF files
+		if !strings.HasSuffix(strings.ToLower(info.Name()), ".pdf") {
 			return nil
 		}
 
@@ -57,11 +64,11 @@ func ProcessAttachments() error {
 						emailDate.Format("2006-01"))
 
 					// Rename the file
-					oldPath := filepath.Join(attachmentsDir, filename)
-					newPath := filepath.Join(attachmentsDir, newFilename)
+					oldPath := filepath.Join(config.AttachmentsDir, filename)
+					newPath := filepath.Join(config.AttachmentsDir, newFilename)
 
 					if err := os.Rename(oldPath, newPath); err != nil {
-						log.Printf("Error renaming file %s: %v", filename, err)
+						log.Printf("Error renaming file %s to %s: %v", filename, newFilename, err)
 						continue
 					}
 
@@ -70,7 +77,7 @@ func ProcessAttachments() error {
 						log.Printf("Error updating attachment status for %s: %v", filename, err)
 					}
 
-					log.Printf("Processed attachment: %s -> %s", filename, newFilename)
+					fmt.Printf("Renamed %s to %s\n", filename, newFilename)
 				}
 				break
 			}

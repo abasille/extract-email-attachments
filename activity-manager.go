@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"extract-email-attachments/config"
 	"fmt"
 	"log"
 	"os"
@@ -14,7 +15,6 @@ import (
 
 const (
 	defaultDirPerm  = 0755
-	defaultFilePath = "./activity.json"
 	defaultFilePerm = 0644
 )
 
@@ -65,15 +65,7 @@ type ActivityManager struct {
 func NewActivityManager() *ActivityManager {
 	return &ActivityManager{
 		data:     ActivityData{},
-		filePath: defaultFilePath,
-	}
-}
-
-// NewActivityManagerWithPath creates a new ActivityManager instance with a custom file path.
-func NewActivityManagerWithPath(filePath string) *ActivityManager {
-	return &ActivityManager{
-		data:     ActivityData{},
-		filePath: filePath,
+		filePath: config.AppSupportDir + "/activity.json",
 	}
 }
 
