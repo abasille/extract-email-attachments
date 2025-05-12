@@ -3,11 +3,6 @@
 # Application name
 APP_NAME="extract-email-attachments"
 
-# Create necessary directories following macOS conventions
-echo "Creating application directories..."
-mkdir -p ~/Library/Caches/$APP_NAME
-mkdir -p ~/Library/Logs/$APP_NAME
-
 # Compile the Go binary
 echo "Compiling Go binary..."
 go build -o ~/.bin/$APP_NAME

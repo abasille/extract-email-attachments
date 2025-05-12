@@ -1,5 +1,11 @@
 # Extract Email Attachments
 
+## Prérequis techniques
+
+- Go 1.20 ou supérieur.
+- OS : Testé uniquement avec macOS. Devrait fonctionner sous Linux moyennant quelques adpatations.
+- Seul Gmail est supporté actuellement.
+
 Application Go pour extraire les pièces jointes des emails Gmail.
 
 ## Configuration
@@ -9,8 +15,7 @@ Application Go pour extraire les pièces jointes des emails Gmail.
 3. Configurez les identifiants OAuth 2.0 :
    - Type d'application : Application de bureau (Desktop app)
    - Ajoutez l'URL de redirection : `http://localhost:8080`
-   - Téléchargez le fichier `client_secret.json` ou notez le Client ID et le Client Secret
-4. Placez le client ID et le client secret dans la configuration de l'application (voir le code source)
+   - Téléchargez le fichier `client_secret.json` dans `./config/extract-email-attachments` ou renseignez les variables d'environnement `GOOGLE_CLIENT_ID` et `GOOGLE_CLIENT_SECRET`.
 
 ## Authentification OAuth2 (PKCE)
 
@@ -18,7 +23,7 @@ Application Go pour extraire les pièces jointes des emails Gmail.
 - Google requiert malgré tout un client secret pour les applications de bureau, même avec PKCE.
 - Lors du premier lancement, une fenêtre de navigateur s'ouvre pour l'authentification et le consentement utilisateur.
 - Le code d'autorisation est automatiquement récupéré via un serveur local (`http://localhost:8080`).
-- Le token d'accès est stocké localement dans `token.json`.
+- Le token d'accès est stocké localement dans `./config/extract-email-attachments/caches/token.json`.
 
 ## Installation
 
@@ -31,26 +36,35 @@ go build
 ./install.sh
 ```
 
+Ajouter `~/.bin/` à votre `$PATH`.
+
 ## Utilisation
 
-1. Lancez l'application
+1. Lancez l'application `extract-email-attachments`
 2. Suivez le processus d'authentification OAuth :
-   - Une URL s'affichera dans la console (et/ou le navigateur s'ouvrira automatiquement)
+   - Le navigateur par défaut s'ouvrira automatiquement
    - Connectez-vous avec votre compte Google
    - Autorisez l'accès
    - Le code d'autorisation est récupéré automatiquement
-3. Les pièces jointes seront extraites dans le dossier `attachments/`
+3. Les pièces jointes seront extraites dans le sous-dossier `attachments/` des téléchargements.
 
-## Sécurité
+## Tests
 
-- Le Client ID et le Client Secret sont nécessaires pour l'authentification OAuth2
-- Les tokens d'accès sont stockés localement dans `token.json`
-- Utilisez des variables d'environnement ou un fichier de configuration pour les informations sensibles en production
+Pour exécuter les tests :
 
-## Développement
+```bash
+# Exécuter tous les tests
+go test ./...
 
-Pour le développement, vous pouvez utiliser votre propre Client ID et Client Secret en les modifiant dans le code source ou via un fichier de configuration.
+# Exécuter les tests avec plus de détails
+go test -v ./...
+
+# Voir la couverture de test
+go test -cover ./...
+```
 
 ## Licence
 
-MIT 
+MIT License
+
+Copyright (©) 2025 Aurélien BASILLE
