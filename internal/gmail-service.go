@@ -20,6 +20,7 @@ import (
 	"google.golang.org/api/gmail/v1"
 	"google.golang.org/api/option"
 
+	"crypto/sha256"
 	"extract-email-attachments/internal/config"
 )
 
@@ -293,7 +294,9 @@ func (gs *GmailService) downloadAttachment(messageID string, part *gmail.Message
 		return NewError("downloadAttachment", err, "failed to write attachment file")
 	}
 
-	if err := am.StoreAttachmentMeta(part.Filename, messageID); err != nil {
+	sha256Hash := fmt.Sprintf("%x", sha256.Sum256(data))
+
+	if err := am.StoreAttachmentMeta(part.Filename, messageID, sha256Hash); err != nil {
 		log.Printf("Warning: Error storing attachment metadata: %v", err)
 		// Ne pas retourner l'erreur car ce n'est pas critique
 	}

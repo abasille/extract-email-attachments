@@ -25,7 +25,7 @@ type ActivityManagerInterface interface {
 	Save() error
 	HasEmailID(string) bool
 	StoreEmailMeta(string, *gmail.Message) error
-	StoreAttachmentMeta(string, string) error
+	StoreAttachmentMeta(string, string, string) error
 	ReadLastFetchTime() (string, error)
 	StoreLastFetchTime() error
 	UpdateAttachmentStatus(string, string) error
@@ -50,9 +50,10 @@ type EmailData struct {
 
 // AttachmentData represents the structure for storing attachment metadata.
 type AttachmentData struct {
-	Filename string `json:"filename"`
-	EmailID  string `json:"emailId"`
-	Status   string `json:"status,omitempty"`
+	Filename   string `json:"filename"`
+	EmailID    string `json:"emailId"`
+	Status     string `json:"status,omitempty"`
+	Sha256Hash string `json:"sha256Hash,omitempty"`
 }
 
 // ActivityManager manages the activity data operations.
@@ -60,6 +61,19 @@ type ActivityManager struct {
 	mu       sync.RWMutex
 	data     ActivityData
 	filePath string
+}
+
+func (am *ActivityManager) GetAttachment(sha256Hash string) (AttachmentData, error) {
+	am.mu.RLock()
+	defer am.mu.RUnlock()
+
+	for _, attachment := range am.data.Attachments {
+		if attachment.Sha256Hash == sha256Hash {
+			return attachment, nil
+		}
+	}
+
+	return AttachmentData{}, fmt.Errorf("attachment not found: %s", sha256Hash)
 }
 
 // NewActivityManager creates a new ActivityManager instance.
@@ -207,7 +221,7 @@ func (am *ActivityManager) StoreEmailMeta(emailID string, msg *gmail.Message) er
 }
 
 // StoreAttachmentMeta stores the metadata of an attachment into the in-memory activity data.
-func (am *ActivityManager) StoreAttachmentMeta(filename string, emailID string) error {
+func (am *ActivityManager) StoreAttachmentMeta(filename string, emailID string, sha256Hash string) error {
 	if filename == "" {
 		return fmt.Errorf("filename cannot be empty")
 	}
@@ -225,8 +239,9 @@ func (am *ActivityManager) StoreAttachmentMeta(filename string, emailID string) 
 
 	// Append the new attachment metadata
 	am.data.Attachments = append(am.data.Attachments, AttachmentData{
-		Filename: filename,
-		EmailID:  emailID,
+		EmailID:    emailID,
+		Filename:   filename,
+		Sha256Hash: sha256Hash,
 	})
 
 	fmt.Printf("Stored attachment %s for email ID %s in memory.\n", filename, emailID)
