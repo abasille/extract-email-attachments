@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"extract-email-attachments/config"
+	"extract-email-attachments/internal/config"
 )
 
 // ProcessAttachments processes each attachment in the attachments directory
@@ -20,7 +20,7 @@ func ProcessAttachments() error {
 	}
 
 	// Walk through all files in the attachments directory
-	err := filepath.Walk(config.AttachmentsDir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(config.AppAttachmentsDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -64,8 +64,8 @@ func ProcessAttachments() error {
 						emailDate.Format("2006-01"))
 
 					// Rename the file
-					oldPath := filepath.Join(config.AttachmentsDir, filename)
-					newPath := filepath.Join(config.AttachmentsDir, newFilename)
+					oldPath := filepath.Join(config.AppAttachmentsDir, filename)
+					newPath := filepath.Join(config.AppAttachmentsDir, newFilename)
 
 					if err := os.Rename(oldPath, newPath); err != nil {
 						log.Printf("Error renaming file %s to %s: %v", filename, newFilename, err)

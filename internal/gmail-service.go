@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"bufio"
@@ -21,7 +21,7 @@ import (
 	"google.golang.org/api/gmail/v1"
 	"google.golang.org/api/option"
 
-	"extract-email-attachments/config"
+	"extract-email-attachments/internal/config"
 )
 
 // GmailService represents a Gmail service client
@@ -159,7 +159,7 @@ func ProcessEmails() error {
 	lastFetchTime, err := activityManager.ReadLastFetchTime()
 	if err != nil {
 		log.Printf("Error reading last fetch time: %v", err)
-		lastFetchTime = time.Now().AddDate(0, 0, -30).Format(defaultDateFormat)
+		lastFetchTime = time.Now().AddDate(0, 0, -30).Format(config.DefaultDateFormat)
 	}
 
 	messages, err := gmailService.listMessages(lastFetchTime)
@@ -262,11 +262,11 @@ func (gs *GmailService) downloadAttachment(messageID string, part *gmail.Message
 		return fmt.Errorf("error decoding attachment: %v", err)
 	}
 
-	if err := os.MkdirAll(config.AttachmentsDir, defaultDirPerm); err != nil {
+	if err := os.MkdirAll(config.AppAttachmentsDir, defaultDirPerm); err != nil {
 		return fmt.Errorf("error creating directory: %v", err)
 	}
 
-	filePath := fmt.Sprintf("%s/%s", config.AttachmentsDir, part.Filename)
+	filePath := fmt.Sprintf("%s/%s", config.AppAttachmentsDir, part.Filename)
 	if err := os.WriteFile(filePath, data, defaultFilePerm); err != nil {
 		return fmt.Errorf("error writing file: %v", err)
 	}

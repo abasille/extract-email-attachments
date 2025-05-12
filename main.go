@@ -3,11 +3,8 @@ package main
 import (
 	"log"
 
-	"extract-email-attachments/config"
-)
-
-const (
-	defaultDateFormat = "2006/01/02"
+	"extract-email-attachments/internal"
+	"extract-email-attachments/internal/config"
 )
 
 func main() {
@@ -15,13 +12,12 @@ func main() {
 	if err := config.InitAppPaths(); err != nil {
 		log.Fatalf("Error initializing application paths: %v", err)
 	}
-
 	// Process emails and attachments
-	if err := ProcessEmails(); err != nil {
+	if err := internal.ProcessEmails(); err != nil {
 		log.Fatalf("Error processing emails: %v", err)
 	}
 
-	if err := ProcessAttachments(); err != nil {
+	if err := internal.ProcessAttachments(); err != nil {
 		log.Fatalf("Error processing attachments: %v", err)
 	}
 }

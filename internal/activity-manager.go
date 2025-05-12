@@ -1,14 +1,15 @@
-package main
+package internal
 
 import (
 	"encoding/json"
-	"extract-email-attachments/config"
 	"fmt"
 	"log"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"extract-email-attachments/internal/config"
 
 	"google.golang.org/api/gmail/v1"
 )
@@ -65,7 +66,7 @@ type ActivityManager struct {
 func NewActivityManager() *ActivityManager {
 	return &ActivityManager{
 		data:     ActivityData{},
-		filePath: config.AppSupportDir + "/activity.json",
+		filePath: config.AppConfigDir + "/activity.json",
 	}
 }
 
@@ -128,7 +129,7 @@ func (am *ActivityManager) ReadLastFetchTime() (string, error) {
 	defer am.mu.RUnlock()
 
 	if am.data.LastFetchTime == "" {
-		return time.Now().AddDate(0, 0, -30).Format(defaultDateFormat), nil
+		return time.Now().AddDate(0, 0, -30).Format(config.DefaultDateFormat), nil
 	}
 
 	t, err := time.Parse(time.RFC3339, am.data.LastFetchTime)
@@ -136,7 +137,7 @@ func (am *ActivityManager) ReadLastFetchTime() (string, error) {
 		return "", fmt.Errorf("error parsing last fetch time: %v", err)
 	}
 
-	return t.Format(defaultDateFormat), nil
+	return t.Format(config.DefaultDateFormat), nil
 }
 
 // StoreLastFetchTime updates the last fetch time in the in-memory activity data.

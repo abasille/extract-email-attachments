@@ -1,23 +1,25 @@
-package main
+package internal
 
 import (
 	"context"
 	"encoding/json"
-	"extract-email-attachments/config"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"time"
+
+	"extract-email-attachments/internal/config"
 
 	"golang.org/x/oauth2"
 )
 
 // getOAuth2Client retrieves a token, saves the token, then returns the generated client.
 func getOAuth2Client(oauth2Config *oauth2.Config) *http.Client {
-	tokenFilePath := config.CacheDir + "/token.json"
+	tokenFilePath := filepath.Join(config.AppCacheDir, "token.json")
 	token, err := tokenFromFile(tokenFilePath)
 	if err != nil {
 		token = getTokenFromWeb(oauth2Config)
@@ -137,7 +139,6 @@ func tokenFromFile(file string) (*oauth2.Token, error) {
 
 // saveToken saves a token to a file path.
 func saveToken(path string, token *oauth2.Token) {
-	fmt.Printf("Saving credential file to: %s\n", path)
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		log.Fatalf("Unable to cache oauth token: %v", err)
