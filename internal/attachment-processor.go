@@ -16,13 +16,15 @@ import (
 func ProcessAttachments() error {
 	activityManager := NewActivityManager()
 	if err := activityManager.Load(); err != nil {
-		return fmt.Errorf("error loading activity data: %v", err)
+		return NewError("ProcessAttachments", err, "failed to load activity data")
 	}
+
+	var processingErrors []error
 
 	// Walk through all files in the attachments directory
 	err := filepath.Walk(config.AppAttachmentsDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			return NewError("ProcessAttachments", err, fmt.Sprintf("failed to access path %s", path))
 		}
 
 		// Skip directories
@@ -44,7 +46,9 @@ func ProcessAttachments() error {
 				// Get the associated email
 				email, err := activityManager.GetEmailByID(attachment.EmailID)
 				if err != nil {
-					log.Printf("Error finding email for attachment %s: %v", filename, err)
+					err = NewError("ProcessAttachments", err, fmt.Sprintf("failed to find email for attachment %s", filename))
+					log.Printf("Error: %v", err)
+					processingErrors = append(processingErrors, err)
 					continue
 				}
 
@@ -55,7 +59,9 @@ func ProcessAttachments() error {
 					// Parse the email date
 					emailDate, err := time.Parse(time.RFC3339, email.Date)
 					if err != nil {
-						log.Printf("Error parsing email date for %s: %v", filename, err)
+						err = NewError("ProcessAttachments", err, fmt.Sprintf("failed to parse email date for %s", filename))
+						log.Printf("Error: %v", err)
+						processingErrors = append(processingErrors, err)
 						continue
 					}
 
@@ -68,13 +74,16 @@ func ProcessAttachments() error {
 					newPath := filepath.Join(config.AppAttachmentsDir, newFilename)
 
 					if err := os.Rename(oldPath, newPath); err != nil {
-						log.Printf("Error renaming file %s to %s: %v", filename, newFilename, err)
+						err = NewError("ProcessAttachments", err, fmt.Sprintf("failed to rename file %s to %s", filename, newFilename))
+						log.Printf("Error: %v", err)
+						processingErrors = append(processingErrors, err)
 						continue
 					}
 
 					// Update attachment status
 					if err := activityManager.UpdateAttachmentStatus(filename, "processed"); err != nil {
-						log.Printf("Error updating attachment status for %s: %v", filename, err)
+						log.Printf("Warning: Error updating attachment status for %s: %v", filename, err)
+						// Ne pas retourner l'erreur car ce n'est pas critique
 					}
 
 					fmt.Printf("Renamed %s to %s\n", filename, newFilename)
@@ -86,9 +95,18 @@ func ProcessAttachments() error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("error processing attachments: %v", err)
+		return NewError("ProcessAttachments", err, "failed to walk through attachments directory")
 	}
 
 	// Save the updated activity data
-	return activityManager.Save()
+	if err := activityManager.Save(); err != nil {
+		return NewError("ProcessAttachments", err, "failed to save activity data")
+	}
+
+	// Si des erreurs de traitement se sont produites, les retourner
+	if len(processingErrors) > 0 {
+		return NewError("ProcessAttachments", ErrAttachmentProcessing, fmt.Sprintf("encountered %d errors while processing attachments", len(processingErrors)))
+	}
+
+	return nil
 }

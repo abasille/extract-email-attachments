@@ -11,7 +11,7 @@ import (
 func displayNotification(message string) error {
 	// Check if we're running on macOS
 	if runtime.GOOS != "darwin" {
-		return fmt.Errorf("system notifications are only supported on macOS")
+		return NewError("displayNotification", ErrCritical, "system notifications are only supported on macOS")
 	}
 
 	// Check if terminal-notifier is installed
@@ -19,7 +19,7 @@ func displayNotification(message string) error {
 		// Install terminal-notifier using Homebrew
 		installCmd := exec.Command("brew", "install", "terminal-notifier")
 		if err := installCmd.Run(); err != nil {
-			return fmt.Errorf("failed to install terminal-notifier: %v", err)
+			return NewError("displayNotification", err, "failed to install terminal-notifier")
 		}
 	}
 
@@ -32,7 +32,7 @@ func displayNotification(message string) error {
 
 	// Execute the command
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to display notification: %v", err)
+		return NewError("displayNotification", ErrNotificationFailed, fmt.Sprintf("failed to display notification: %v", err))
 	}
 
 	return nil
@@ -52,7 +52,7 @@ func HandleNotificationClick(url string) error {
 		// Execute the command to open the folder
 		cmd := exec.Command("open", path)
 		if err := cmd.Start(); err != nil {
-			return fmt.Errorf("failed to open attachments directory: %v", err)
+			return NewError("HandleNotificationClick", err, fmt.Sprintf("failed to open attachments directory: %s", path))
 		}
 	}
 

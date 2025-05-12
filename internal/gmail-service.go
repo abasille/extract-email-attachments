@@ -124,23 +124,23 @@ func NewGmailService() (*GmailService, error) {
 func ProcessEmails() error {
 	gmailService, err := NewGmailService()
 	if err != nil {
-		return err
+		return NewError("ProcessEmails", err, "failed to initialize Gmail service")
 	}
 
 	activityManager := NewActivityManager()
 	if err := activityManager.Load(); err != nil {
-		return fmt.Errorf("error loading activity data: %v", err)
+		return NewError("ProcessEmails", err, "failed to load activity data")
 	}
 
 	lastFetchTime, err := activityManager.ReadLastFetchTime()
 	if err != nil {
-		log.Printf("Error reading last fetch time: %v", err)
+		log.Printf("Warning: Error reading last fetch time: %v", err)
 		lastFetchTime = time.Now().AddDate(0, 0, -30).Format(config.DefaultDateFormat)
 	}
 
 	messages, err := gmailService.listMessages(lastFetchTime)
 	if err != nil {
-		return err
+		return NewError("ProcessEmails", err, "failed to list messages")
 	}
 
 	if len(messages) == 0 {
@@ -148,6 +148,7 @@ func ProcessEmails() error {
 		fmt.Println(message)
 		if err := displayNotification(message); err != nil {
 			log.Printf("Warning: Could not display notification: %v", err)
+			// Ne pas retourner l'erreur car ce n'est pas critique
 		}
 		return nil
 	}
@@ -156,20 +157,34 @@ func ProcessEmails() error {
 	fmt.Println(message)
 	if err := displayNotification(message); err != nil {
 		log.Printf("Warning: Could not display notification: %v", err)
+		// Ne pas retourner l'erreur car ce n'est pas critique
 	}
 
+	var processingErrors []error
 	for _, msg := range messages {
 		if err := gmailService.processMessage(activityManager, msg); err != nil {
-			log.Printf("Error processing message %s: %v", msg.Id, err)
+			err = NewError("ProcessEmails", err, fmt.Sprintf("failed to process message %s", msg.Id))
+			log.Printf("Error: %v", err)
+			processingErrors = append(processingErrors, err)
 			continue
 		}
 	}
 
 	if err := activityManager.StoreLastFetchTime(); err != nil {
-		log.Printf("Error writing last fetch time: %v", err)
+		log.Printf("Warning: Error writing last fetch time: %v", err)
+		// Ne pas retourner l'erreur car ce n'est pas critique
 	}
 
-	return activityManager.Save()
+	if err := activityManager.Save(); err != nil {
+		return NewError("ProcessEmails", err, "failed to save activity data")
+	}
+
+	// Si des erreurs de traitement se sont produites, les retourner
+	if len(processingErrors) > 0 {
+		return NewError("ProcessEmails", ErrEmailProcessing, fmt.Sprintf("encountered %d errors while processing messages", len(processingErrors)))
+	}
+
+	return nil
 }
 
 // listMessages retrieves messages with PDF attachments after the given time
@@ -177,7 +192,7 @@ func (gs *GmailService) listMessages(afterTime string) ([]*gmail.Message, error)
 	query := fmt.Sprintf("after:%s has:attachment filename:pdf", afterTime)
 	r, err := gs.service.Users.Messages.List(gs.user).Q(query).Do()
 	if err != nil {
-		return nil, fmt.Errorf("unable to retrieve messages: %v", err)
+		return nil, NewError("listMessages", err, "failed to retrieve messages from Gmail API")
 	}
 
 	if len(r.Messages) == 0 {
@@ -185,13 +200,20 @@ func (gs *GmailService) listMessages(afterTime string) ([]*gmail.Message, error)
 	}
 
 	var messages []*gmail.Message
+	var errors []error
 	for _, m := range r.Messages {
 		msg, err := gs.service.Users.Messages.Get(gs.user, m.Id).Do()
 		if err != nil {
-			log.Printf("Error getting message %s: %v", m.Id, err)
+			err = NewError("listMessages", err, fmt.Sprintf("failed to get message %s", m.Id))
+			log.Printf("Error: %v", err)
+			errors = append(errors, err)
 			continue
 		}
 		messages = append(messages, msg)
+	}
+
+	if len(errors) > 0 {
+		return messages, NewError("listMessages", ErrGmailAPI, fmt.Sprintf("encountered %d errors while retrieving messages", len(errors)))
 	}
 
 	return messages, nil
@@ -201,55 +223,79 @@ func (gs *GmailService) listMessages(afterTime string) ([]*gmail.Message, error)
 func (gs *GmailService) processMessage(am *ActivityManager, msg *gmail.Message) error {
 	fmt.Printf("Message ID: %s, Subject: %s\n", msg.Id, getSubject(msg))
 
+	if msg.Id == "" {
+		return NewError("processMessage", ErrInvalidEmailID, "message ID is empty")
+	}
+
 	if am.HasEmailID(msg.Id) {
 		fmt.Printf("Skipping message %s as it was already processed\n", msg.Id)
 		return nil
 	}
 
 	if err := am.StoreEmailMeta(msg.Id, msg); err != nil {
-		return fmt.Errorf("error storing email metadata: %v", err)
+		return NewError("processMessage", err, "failed to store email metadata")
 	}
 
-	return gs.downloadAttachments(msg, am)
+	if err := gs.downloadAttachments(msg, am); err != nil {
+		return NewError("processMessage", err, "failed to download attachments")
+	}
+
+	return nil
 }
 
 // downloadAttachments downloads PDF attachments from a message
 func (gs *GmailService) downloadAttachments(msg *gmail.Message, am *ActivityManager) error {
+	var errors []error
 	for _, part := range msg.Payload.Parts {
 		if part.Filename != "" && part.MimeType == "application/pdf" {
 			if err := gs.downloadAttachment(msg.Id, part, am); err != nil {
-				log.Printf("Error downloading attachment: %v", err)
+				err = NewError("downloadAttachments", err, fmt.Sprintf("failed to download attachment %s", part.Filename))
+				log.Printf("Error: %v", err)
+				errors = append(errors, err)
 				continue
 			}
 		}
 	}
+
+	if len(errors) > 0 {
+		return NewError("downloadAttachments", ErrAttachmentProcessing, fmt.Sprintf("encountered %d errors while downloading attachments", len(errors)))
+	}
+
 	return nil
 }
 
 // downloadAttachment downloads a single attachment
 func (gs *GmailService) downloadAttachment(messageID string, part *gmail.MessagePart, am *ActivityManager) error {
+	if messageID == "" {
+		return NewError("downloadAttachment", ErrInvalidEmailID, "message ID is empty")
+	}
+
+	if part.Filename == "" {
+		return NewError("downloadAttachment", ErrInvalidFilename, "attachment filename is empty")
+	}
+
 	attachment, err := gs.service.Users.Messages.Attachments.Get(gs.user, messageID, part.Body.AttachmentId).Do()
 	if err != nil {
-		return fmt.Errorf("error getting attachment: %v", err)
+		return NewError("downloadAttachment", err, "failed to get attachment from Gmail API")
 	}
 
 	data, err := base64.URLEncoding.DecodeString(attachment.Data)
 	if err != nil {
-		return fmt.Errorf("error decoding attachment: %v", err)
+		return NewError("downloadAttachment", err, "failed to decode attachment data")
 	}
 
 	if err := os.MkdirAll(config.AppAttachmentsDir, defaultDirPerm); err != nil {
-		return fmt.Errorf("error creating directory: %v", err)
+		return NewError("downloadAttachment", err, "failed to create attachments directory")
 	}
 
 	filePath := fmt.Sprintf("%s/%s", config.AppAttachmentsDir, part.Filename)
 	if err := os.WriteFile(filePath, data, defaultFilePerm); err != nil {
-		return fmt.Errorf("error writing file: %v", err)
+		return NewError("downloadAttachment", err, "failed to write attachment file")
 	}
 
-	// Store attachment metadata
 	if err := am.StoreAttachmentMeta(part.Filename, messageID); err != nil {
-		log.Printf("Error storing attachment metadata: %v", err)
+		log.Printf("Warning: Error storing attachment metadata: %v", err)
+		// Ne pas retourner l'erreur car ce n'est pas critique
 	}
 
 	fmt.Printf("Downloaded attachment: %s\n", filePath)
