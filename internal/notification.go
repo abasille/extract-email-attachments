@@ -14,17 +14,8 @@ func displayNotification(message string) error {
 		return NewError("displayNotification", ErrCritical, "system notifications are only supported on macOS")
 	}
 
-	// Check if terminal-notifier is installed
-	if _, err := exec.LookPath("terminal-notifier"); err != nil {
-		// Install terminal-notifier using Homebrew
-		installCmd := exec.Command("brew", "install", "terminal-notifier")
-		if err := installCmd.Run(); err != nil {
-			return NewError("displayNotification", err, "failed to install terminal-notifier")
-		}
-	}
-
 	// Create the notification command
-	cmd := exec.Command("terminal-notifier",
+	cmd := exec.Command(config.TerminalNotifierPath,
 		"-title", "Extract Email Attachments",
 		"-message", message,
 		"-open", "file://"+config.AppAttachmentsDir,

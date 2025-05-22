@@ -33,6 +33,7 @@ Application Go pour extraire les pièces jointes des emails Gmail.
    - Type d'application : Application de bureau (Desktop app)
    - Ajoutez l'URL de redirection : `http://localhost:8080`
    - Téléchargez le fichier `client_secret.json` dans `./config/extract-email-attachments` ou renseignez les variables d'environnement `GOOGLE_CLIENT_ID` et `GOOGLE_CLIENT_SECRET`.
+4. Installez `terminal-notifier` avec brew : `brew install terminal-notifier`
 
 ## Authentification OAuth2 (PKCE)
 

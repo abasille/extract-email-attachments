@@ -1,7 +1,9 @@
 package config
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 )
 
@@ -14,8 +16,9 @@ var (
 	AppLogDir    string
 
 	// Specific paths
-	AppAttachmentsDir string
-	UserDownloadsDir  string
+	AppAttachmentsDir    string
+	TerminalNotifierPath string
+	UserDownloadsDir     string
 )
 
 // InitAppPaths initializes all necessary paths for the application
@@ -33,6 +36,7 @@ func InitAppPaths() error {
 	// Set up specific paths
 	UserDownloadsDir = filepath.Join(homeDir, "Downloads")
 	AppAttachmentsDir = filepath.Join(UserDownloadsDir, "attachments")
+	TerminalNotifierPath = "/opt/homebrew/bin/terminal-notifier"
 
 	// Create directories if they don't exist
 	dirs := []string{AppConfigDir, AppCacheDir, AppLogDir, UserDownloadsDir, AppAttachmentsDir}
@@ -40,6 +44,11 @@ func InitAppPaths() error {
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
 			os.MkdirAll(dir, 0755)
 		}
+	}
+
+	// Check if terminal-notifier is installed
+	if _, err := exec.LookPath(TerminalNotifierPath); err != nil {
+		return fmt.Errorf("terminal-notifier is not installed: %w", err)
 	}
 
 	return nil
