@@ -145,12 +145,7 @@ func ProcessEmails() error {
 	}
 
 	if len(messages) == 0 {
-		message := fmt.Sprintf("No messages found since last fetch: %s", lastFetchTime)
-		fmt.Println(message)
-		if err := displayNotification(message); err != nil {
-			log.Printf("Warning: Could not display notification: %v", err)
-			// Ne pas retourner l'erreur car ce n'est pas critique
-		}
+		// No messages found since last fetch
 		return nil
 	}
 
